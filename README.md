@@ -29,6 +29,8 @@ coshrl() {
 output of the command
  - Enable the use of clipboards other than wl-clipboard
  - Print output to stdout as it comes in
- - Enable piping input into coshr (this will only work with -o)
+ - Enable piping input into coshr (this will automaticly use -o)
  - Enable formatting of copied text for already ran commands which can't
  be re-run quickly
+ - Enable more output formats (html, plain, pastebin)
+ - Add config file for
