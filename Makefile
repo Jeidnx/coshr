@@ -1,5 +1,7 @@
+DESTDIR = /
+
 install: coshr.sh template.html
-	mkdir -p /usr/bin/
-	mkdir -p /usr/share/doc/coshr/
-	install -Dm 755 coshr.sh /usr/bin/coshr
-	install -Dm 644 template.html /usr/share/doc/coshr/template.html
+	install -d ${DESTDIR}usr/bin
+	install -m 755 coshr.sh ${DESTDIR}usr/bin/coshr
+	install -d ${DESTDIR}usr/share/doc/coshr/
+	install -m 444 template.html ${DESTDIR}usr/share/doc/coshr/template.html
