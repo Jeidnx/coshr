@@ -10,6 +10,7 @@ usage () {
   >&2 echo '  -h            Show this help page'
   >&2 echo '  -V            Print version number and quit'
   >&2 echo '  -v            Show verbose output'
+  >&2 echo '  -e            Capture also stderr (no effect when reading from stdin)'
   >&2 echo '  -f <format>   Change output format'
   >&2 echo '  -l <language> Add <language> to code block. Only works with markdown format'
   >&2 echo '  -u            Upload output to 0x0'
@@ -25,12 +26,13 @@ TEMPLATE="${TEMPLATE:-/usr/share/doc/coshr/template.html}"
 VERBOSE=
 UPLOAD=
 
-while getopts ':hVvf:l:uo' arg; do
+while getopts ':hVvef:l:uo' arg; do
   case "${arg}" in
     h)
       usage
       exit 0;;
     v)VERBOSE=true;;
+    e)CAPTURE_ERROR=true;;
     V)
       echo "coshr version: $VERSION"
       exit 0;;
@@ -61,7 +63,7 @@ else
     echo "Error: No command supplied."
     exit 1
   fi
-  cmd=$(bash -c "$@")
+  [ -n "$CAPTURE_ERROR" ] && cmd=$(bash -c "$@" 2>&1) || cmd=$(bash -c "$@" 2>/dev/null)
 fi
 
 cmd=$(echo "$cmd" | \
