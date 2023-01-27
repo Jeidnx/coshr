@@ -173,6 +173,5 @@ coshrl() {
  - Fix error where markdown is malformed when 4 backticks are in the
 output of the command
  - Enable the use of clipboards other than wl-clipboard
- - Print output to stdout as it comes in
  - Enable formatting of copied text for already ran commands which can't
  be re-run quickly

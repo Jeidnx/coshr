@@ -2,7 +2,7 @@
 
 set -e
 
-VERSION="0.2"
+VERSION="0.3"
 
 usage () {
   >&2 echo 'coshr - easily share your command output'
@@ -23,8 +23,6 @@ FILE="$HOME/.config/coshr/config" && test -f "$FILE" && source "$FILE"
 FORMAT="${FORMAT:-md}"
 INSTANCE="${INSTANCE:-0x0.st}"
 TEMPLATE="${TEMPLATE:-/usr/share/doc/coshr/template.html}"
-VERBOSE=
-UPLOAD=
 
 while getopts ':hVvef:l:uo' arg; do
   case "${arg}" in
@@ -41,10 +39,10 @@ while getopts ':hVvef:l:uo' arg; do
     u)UPLOAD=true;;
     o)HIDECMD=true;;
     :)
-      echo "$0: Must supply an argument to '-$OPTARG'." >&2
+      echo "Error: Must supply an argument to '-$OPTARG'." >&2
       exit 1;;
     ?)
-      echo "$0: Invalid option '-${OPTARG}'" >&2
+      echo "Error: Invalid option '-${OPTARG}'" >&2
       exit 2;;
   esac
 done
@@ -56,56 +54,63 @@ cmd=""
 if test ! -t 0; then
   [ -n "$VERBOSE" ] && echo "[VERBOSE] reading from stdin"
   HIDECMD=true
-  cmd=$(cat)
+  while IFS= read -r line; do
+    echo "$line"
+    cmd+="$line\n"
+  done < <(sed -u 's/\x1B[@A-Z\\\]^_]\|\x1B\[[0-9:;<=>?]*[-!"#$%&'"'"'()*+,.\/]*[][\\@A-Z^_`a-z{|}~]//g')
 else
-  [ -n "$VERBOSE" ] && echo "[VERBOSE] executing command: '$*'"
   if [ -z "${*+x}" ]; then
     echo "Error: No command supplied."
     exit 1
   fi
-  [ -n "$CAPTURE_ERROR" ] && cmd=$(bash -c "$@" 2>&1) || cmd=$(bash -c "$@" 2>/dev/null)
+  [ -n "$VERBOSE" ] && echo "[VERBOSE] executing command: '$*'"
+  if [ -n "$CAPTURE_ERROR" ]; then
+     while IFS= read -r line; do
+      echo "$line"
+      cmd+="$line\n"
+    done < <(2>&1 bash -c "$@" | sed -u 's/\x1B[@A-Z\\\]^_]\|\x1B\[[0-9:;<=>?]*[-!"#$%&'"'"'()*+,.\/]*[][\\@A-Z^_`a-z{|}~]//g')
+  else
+     while IFS= read -r line; do
+      echo "$line"
+      cmd+="$line\n"
+    done < <(bash -c "$@" 2>/dev/null | sed -u 's/\x1B[@A-Z\\\]^_]\|\x1B\[[0-9:;<=>?]*[-!"#$%&'"'"'()*+,.\/]*[][\\@A-Z^_`a-z{|}~]//g')
+  fi
 fi
 
-cmd=$(echo "$cmd" | \
-  # https://stackoverflow.com/a/51141872 
-    sed 's/\x1B[@A-Z\\\]^_]\|\x1B\[[0-9:;<=>?]*[-!"#$%&'"'"'()*+,.\/]*[][\\@A-Z^_`a-z{|}~]//g')
-
-if [ "$VERBOSE" ]; then
-  if [ "$HIDECMD" ]; then
+if [ -n "$VERBOSE" ]; then
+  if [ -n "$HIDECMD" ]; then
     echo "[VERBOSE] not showing command in markdown"
   else
     echo "[VERBOSE] showing command in markdown"
   fi
   [ -n "$ANNOTATION" ] && echo "[VERBOSE] annotating markdown with: '$ANNOTATION'"
-  [ "$UPLOAD" ] && echo "[VERBOSE] using 0x0 instance: '$INSTANCE'"
+  [ -n "$UPLOAD" ] && echo "[VERBOSE] using 0x0 instance: '$INSTANCE'"
 fi
 
 case "$FORMAT" in
   md)
     # shellcheck disable=SC2124
-    [ "$HIDECMD" ] || out+='`'"$@"'`\n'
-    out+='````'"${ANNOTATION}"'\n'"${cmd}"'\n````';;
+    [ -n "$HIDECMD" ] || out+='`$ '"$@"'`\n'
+    out+='````'"${ANNOTATION}"'\n'"${cmd}"'````';;
   plain)
     # shellcheck disable=SC2124
-    [ "$HIDECMD" ] || out+="$@\n\n"
+    [ -n "$HIDECMD" ] || out+='$ '"$@\n\n"
     out+="${cmd}";;
   html)
-    [ "$VERBOSE" ] && echo "[VERBOSE] using HTML template: '$TEMPLATE'"
-    if [ "$HIDECMD" ]; then
+    [ -n "$VERBOSE" ] && echo "[VERBOSE] using HTML template: '$TEMPLATE'"
+    if [ -n "$HIDECMD" ]; then
       out+=$(sed -e '/<!--STARTCMD--!>/,/<!--ENDCMD--!>/d' -e '/<!--OUTPUT--!>/{r /dev/stdin' -e ';d;}' "$TEMPLATE" <<<"$cmd")
     else
       out+=$(sed -e "s#<!--CMD--!>#$*#g" -e '/<!--OUTPUT--!>/{r /dev/stdin' -e ';d;}' "$TEMPLATE" <<<"$cmd")
     fi;;
   *)
-    >&2 echo "Unrecognized format '$FORMAT'. Available options: 'md','plain', 'html'"
+    >&2 echo "Unrecognized format '$FORMAT'. Available options: md, plain, html"
     exit 1;;
 esac
 
-echo -e "$cmd"
-
-if [ "$UPLOAD" ]; then
+if [ -n "$UPLOAD" ]; then
   >&2 echo -n "Continue with upload [y|n] (n): "
-  read -r answer
+  read -r answer </dev/tty
   if [ "$answer" == "y" ]; then
     response=$(echo -e "$out" | curl -i -F'file=@-' -Fsecret= "$INSTANCE")
     expires=$(echo "$response" | grep -i "x-expires" | cut -d' ' -f2)
@@ -120,4 +125,4 @@ if [ "$UPLOAD" ]; then
   exit 0
 fi
 
-echo -e "$out" | wl-copy
+echo -en "$out" | wl-copy
